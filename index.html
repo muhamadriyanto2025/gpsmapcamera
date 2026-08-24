@@ -3,16 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live GPS Camera - Genba Pro</title>
+    <title>Live GPS Camera - Genba</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
+<!-- Kita pakai warna gelap agar terasa seperti aplikasi kamera betulan -->
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center overflow-hidden w-full">
 
     <div class="w-full max-w-md h-screen relative flex flex-col">
         
-        <!-- BAGIAN 1: LAYAR KAMERA -->
+        <!-- BAGIAN 1: LAYAR KAMERA LANGSUNG (LIVE PREVIEW) -->
         <div id="cameraContainer" class="flex-1 relative w-full h-full bg-black">
+            <!-- Video berjalan otomatis dan playsinline penting agar tidak fullscreen di iOS -->
             <video id="videoElement" autoplay playsinline class="w-full h-full object-cover"></video>
+            
+            <!-- Tombol Jepret (Shutter) di atas layar kamera -->
             <div class="absolute bottom-8 left-0 w-full flex justify-center">
                 <button id="btnSnap" class="w-16 h-16 bg-white rounded-full border-4 border-gray-400 shadow-lg active:scale-95 transition-transform flex items-center justify-center">
                     <span class="w-12 h-12 bg-white rounded-full border border-gray-300"></span>
@@ -20,30 +24,33 @@
             </div>
         </div>
 
-        <!-- BAGIAN 2: LAYAR HASIL & LOADING -->
+        <!-- BAGIAN 2: LAYAR HASIL FOTO (Disembunyikan saat kamera menyala) -->
         <div id="resultContainer" class="hidden flex-1 w-full h-full bg-gray-900 flex flex-col p-4">
             
+            <!-- Teks Loading -->
             <div id="loadingText" class="text-yellow-400 text-center font-semibold mb-4 animate-pulse">
-                📍 Mengambil data satelit...
+                📍 Mengambil data satelit dan memproses gambar...
             </div>
 
+            <!-- Preview Hasil Gambar yang sudah ada Watermark-nya -->
             <img id="imagePreview" class="w-full rounded-lg shadow-md hidden object-contain h-[60vh] bg-black">
 
+            <!-- Tombol Aksi (Tampil setelah gambar selesai diproses) -->
             <div id="actionButtons" class="hidden mt-6 flex flex-col gap-3">
-                <!-- Grup tombol sukses (Share & Download) -->
-                <div id="successButtons" class="flex gap-2">
+                <div class="flex gap-2">
                     <button id="btnShare" class="flex-1 bg-green-500 hover:bg-green-600 py-3 rounded-lg font-bold shadow">Kirim ke WA</button>
-                    <button id="btnDownload" class="flex-1 bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold shadow">Simpan</button>
+                    <button id="btnDownload" class="flex-1 bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold shadow">Simpan Galeri</button>
                 </div>
-                <!-- Tombol Retake sekarang dipisah logikanya -->
                 <button id="btnRetake" class="w-full bg-gray-700 hover:bg-gray-600 py-3 rounded-lg font-bold text-gray-200">Batal / Ulangi Foto</button>
             </div>
         </div>
 
+        <!-- Canvas Tersembunyi untuk proses menggambar watermark -->
         <canvas id="canvas" class="hidden"></canvas>
     </div>
 
     <script>
+        // --- DEKLARASI ELEMEN ---
         const videoElement = document.getElementById('videoElement');
         const cameraContainer = document.getElementById('cameraContainer');
         const resultContainer = document.getElementById('resultContainer');
@@ -51,7 +58,6 @@
         const imagePreview = document.getElementById('imagePreview');
         const loadingText = document.getElementById('loadingText');
         const actionButtons = document.getElementById('actionButtons');
-        const successButtons = document.getElementById('successButtons');
         const btnRetake = document.getElementById('btnRetake');
         const btnShare = document.getElementById('btnShare');
         const btnDownload = document.getElementById('btnDownload');
@@ -61,144 +67,141 @@
         let stream = null;
         let processedBlob = null;
 
-        // --- 1. KAMERA ANTI GAGAL ---
+        // --- 1. MENYALAKAN KAMERA ---
         const startCamera = async () => {
             try {
-                // Paksa kamera belakang (HP)
-                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } }, audio: false });
+                // Meminta akses kamera belakang (environment)
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
                 videoElement.srcObject = stream;
             } catch (error) {
-                // Fallback: Jika di laptop, pakai webcam biasa
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                    videoElement.srcObject = stream;
-                } catch (err) {
-                    alert("Kamera gagal diakses. Pastikan izin kamera aktif!");
-                }
+                alert("Gagal mengakses kamera. Pastikan izin kamera di browser sudah diberikan!");
+                console.error("Camera Error:", error);
             }
         };
 
+        // Matikan kamera untuk menghemat baterai saat melihat hasil foto
         const stopCamera = () => {
-            if (stream) stream.getTracks().forEach(track => track.stop());
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
         };
 
-        // --- 2. GPS DENGAN TIMEOUT (Mencegah sistem nge-hang) ---
+        // --- 2. FUNGSI LOKASI DAN WAKTU (Sama dengan sebelumnya) ---
         const getLocation = () => {
             return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) reject('GPS tidak didukung browser');
-                navigator.geolocation.getCurrentPosition(resolve, reject, { 
-                    enableHighAccuracy: true, 
-                    timeout: 10000, // Maksimal cari sinyal 10 detik, jika gagal langsung lempar ke error
-                    maximumAge: 0 
-                });
+                if (!navigator.geolocation) reject('Browser tidak mendukung GPS');
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
             });
         };
 
-        // --- 3. ALAMAT DENGAN NOMOR JALAN ---
         const getAddress = async (lat, lon) => {
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
                 const data = await res.json();
-                
-                if (data && data.address) {
-                    const addr = data.address;
-                    const jalan = addr.road || addr.pedestrian || addr.path || "Nama jalan tidak diketahui";
-                    const nomor = addr.house_number ? `No. ${addr.house_number}` : "";
-                    const desa = addr.village || addr.suburb || addr.neighbourhood || addr.hamlet || "";
-                    const kota = addr.city || addr.town || addr.county || addr.municipality || "";
-                    
-                    const alamatRapi = [jalan, nomor, desa, kota].filter(Boolean).join(", ");
-                    return alamatRapi || data.display_name;
-                }
                 return data.display_name || "Alamat tidak ditemukan";
             } catch (e) {
-                return "Gagal mendapatkan jaringan alamat";
+                return "Gagal mendapatkan nama jalan (cek koneksi)";
             }
         };
 
         const getDateTime = () => {
-            return new Date().toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const now = new Date();
+            return now.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
         };
 
-        // --- 4. PROSES KLIK KAMERA (BUG FIX UI TERAPLIKASI DI SINI) ---
+        // --- 3. PROSES JEPRET FOTO & TEMPEL WATERMARK ---
         btnSnap.addEventListener('click', async () => {
-            // Setup UI awal
+            // Sembunyikan kamera, tampilkan layar hasil
             cameraContainer.classList.add('hidden');
             resultContainer.classList.remove('hidden');
             resultContainer.classList.add('flex');
             
             loadingText.classList.remove('hidden');
-            loadingText.innerText = "📍 Mengambil data satelit dan memproses gambar...";
-            loadingText.classList.replace('text-red-400', 'text-yellow-400');
-            
             imagePreview.classList.add('hidden');
             actionButtons.classList.add('hidden');
-            successButtons.classList.remove('hidden'); // Pastikan tombol hijau & biru muncul jika sukses
 
             try {
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
+                // Ambil ukuran asli video
+                const videoWidth = videoElement.videoWidth;
+                const videoHeight = videoElement.videoHeight;
+                canvas.width = videoWidth;
+                canvas.height = videoHeight;
+
+                // "Jepret": Gambar frame video saat ini ke canvas
                 ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+                // Matikan kamera sementara agar HP tidak panas
                 stopCamera();
 
+                // Ambil GPS dan Alamat
                 const pos = await getLocation();
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
                 const address = await getAddress(lat, lon);
                 const dateTime = getDateTime();
 
-                // Gambar Background & Teks
+                // Konfigurasi Tulisan (Watermark)
                 const padding = 20;
                 const fontSize = Math.max(canvas.width * 0.03, 20); 
                 const bgHeight = (fontSize * 4) + padding * 2;
                 const yPosition = canvas.height - bgHeight;
 
+                // Gambar Background Hitam Transparan
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
                 ctx.fillRect(0, yPosition, canvas.width, bgHeight);
 
+                // Tulis Teks
                 ctx.fillStyle = 'white';
                 ctx.font = `${fontSize}px sans-serif`;
                 ctx.fillText(`📍 ${address}`, padding, yPosition + padding + fontSize);
                 ctx.fillText(`🗺️ Lat: ${lat.toFixed(5)}, Long: ${lon.toFixed(5)}`, padding, yPosition + padding + (fontSize * 2.2));
                 ctx.fillText(`🕒 ${dateTime}`, padding, yPosition + padding + (fontSize * 3.4));
 
+                // Ubah Canvas jadi File Gambar
                 canvas.toBlob((blob) => {
                     processedBlob = blob;
-                    imagePreview.src = URL.createObjectURL(blob);
+                    const objectUrl = URL.createObjectURL(blob);
+                    imagePreview.src = objectUrl;
                     
+                    // Tampilkan Hasil
                     loadingText.classList.add('hidden');
                     imagePreview.classList.remove('hidden');
                     actionButtons.classList.remove('hidden');
                 }, 'image/jpeg', 0.9);
 
             } catch (err) {
-                // JIKA TERJADI ERROR (GPS mati / Susah Sinyal)
-                loadingText.innerText = "⚠️ Gagal mengambil lokasi GPS. Pastikan GPS menyala.";
-                loadingText.classList.replace('text-yellow-400', 'text-red-400');
-                
-                // Munculkan grup tombol, TAPI sembunyikan tombol Share & Simpan
-                actionButtons.classList.remove('hidden');
-                successButtons.classList.add('hidden');
-                // Tombol "Batal / Ulangi" akan tetap terlihat karena tidak disembunyikan!
+                alert("Gagal memproses lokasi. Pastikan GPS HP menyala.");
+                loadingText.innerText = "Gagal memproses gambar. Silakan ulangi.";
             }
         });
 
-        // --- 5. TOMBOL AKSI ---
+        // --- 4. TOMBOL AKSI ---
+
+        // Ulangi Foto (Retake)
         btnRetake.addEventListener('click', () => {
             resultContainer.classList.add('hidden');
             resultContainer.classList.remove('flex');
             cameraContainer.classList.remove('hidden');
-            startCamera();
+            startCamera(); // Nyalakan kamera lagi
         });
 
+        // Share WhatsApp
         btnShare.addEventListener('click', async () => {
             if (!processedBlob) return;
             const file = new File([processedBlob], `Genba_${Date.now()}.jpg`, { type: 'image/jpeg' });
             if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                try { await navigator.share({ files: [file], title: 'Foto Lokasi' }); } catch (e) { console.log('Batal share'); }
-            } else { alert("Gunakan tombol Simpan untuk HP ini."); }
+                try {
+                    await navigator.share({ files: [file], title: 'Foto Lokasi' });
+                } catch (e) { console.log('Batal share'); }
+            } else {
+                alert("Browser tidak mendukung share file. Gunakan tombol Simpan.");
+            }
         });
 
+        // Download / Simpan
         btnDownload.addEventListener('click', () => {
             if (!processedBlob) return;
             const url = URL.createObjectURL(processedBlob);
@@ -210,6 +213,7 @@
             document.body.removeChild(a);
         });
 
+        // --- MULAI KAMERA SAAT WEB DIBUKA ---
         startCamera();
     </script>
 </body>

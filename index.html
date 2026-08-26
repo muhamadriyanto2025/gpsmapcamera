@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Map Camera - Genba Ultimate Pro</title>
+    <title>GPS Map Camera - Genba Clean Proof</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { overflow: hidden; }
@@ -18,7 +18,7 @@
             <video id="videoElement" autoplay playsinline class="w-full h-full object-cover"></video>
             
             <!-- Tombol Pengaturan Cepat di Atas -->
-            <div class="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
+            <div class="absolute top-4 left-4 right-4 flex justify-between items-center z-20">
                 <button id="btnToggleTheme" class="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 text-yellow-400">
                     🎨 Tema: Hitam Pekat
                 </button>
@@ -27,12 +27,19 @@
                 </button>
             </div>
 
-            <!-- Indikator Kompas Live di Layar -->
+            <!-- Indikator Kompas Live -->
             <div class="absolute top-16 left-4 z-10 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] text-gray-200 border border-white/10">
                 🧭 Arah: <span id="liveHeading" class="font-bold text-yellow-400">Memuat...</span>
             </div>
+
+            <!-- PETUNJUK KAMERA FULL SCREEN -->
+            <div class="absolute bottom-24 left-0 right-0 pointer-events-none flex justify-center">
+                <span class="text-[10px] bg-black/60 backdrop-blur-md text-gray-300 px-3 py-1 rounded-full border border-white/10">
+                    📸 Foto akan otomatis ditambah banner alamat di bagian bawah
+                </span>
+            </div>
             
-            <div class="absolute bottom-8 left-0 w-full flex justify-center z-10">
+            <div class="absolute bottom-6 left-0 w-full flex justify-center z-30">
                 <button id="btnSnap" class="w-16 h-16 bg-white rounded-full border-4 border-gray-400 shadow-lg active:scale-95 transition-transform flex items-center justify-center">
                     <span class="w-12 h-12 bg-white rounded-full border border-gray-300"></span>
                 </button>
@@ -59,8 +66,8 @@
         <!-- MODAL 2: INPUT NOMOR BANGUNAN -->
         <div id="inputModal" class="hidden absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-6">
             <div class="bg-gray-800 rounded-xl p-5 w-full max-w-sm flex flex-col gap-4 shadow-2xl border border-gray-700">
-                <h3 class="text-lg font-bold text-yellow-400">🏠 Input Nomor Bangunan</h3>
-                <p id="modalSubText" class="text-xs text-gray-300">Blok, Alamat, & Kecamatan ditarik otomatis dari sistem.</p>
+                <h3 class="text-lg font-bold text-yellow-400">🏠 Input Nomor Bangunan / Gang</h3>
+                <p id="modalSubText" class="text-xs text-gray-300">📍 Mengunci lokasi & alamat...</p>
                 
                 <div class="flex flex-col gap-1">
                     <label class="text-xs text-gray-400">Nomor Bangunan / Rumah / Kios</label>
@@ -75,10 +82,10 @@
         </div>
 
         <!-- BAGIAN 2: HASIL FOTO -->
-        <div id="resultContainer" class="hidden flex-1 w-full h-full bg-gray-900 flex flex-col p-4">
-            <div id="loadingText" class="text-yellow-400 text-center font-semibold mb-4 animate-pulse">📍 Menyusun Alamat, Kompas & Peta...</div>
-            <img id="imagePreview" class="w-full rounded-lg shadow-md hidden object-contain h-[60vh] bg-black">
-            <div id="actionButtons" class="hidden mt-6 flex flex-col gap-3">
+        <div id="resultContainer" class="hidden flex-1 w-full h-full bg-gray-900 flex flex-col p-4 overflow-y-auto">
+            <div id="loadingText" class="text-yellow-400 text-center font-semibold mb-4 animate-pulse">📍 Menyusun Foto & Banner Alamat...</div>
+            <img id="imagePreview" class="w-full rounded-lg shadow-md hidden object-contain max-h-[70vh] bg-black">
+            <div id="actionButtons" class="hidden mt-4 flex flex-col gap-3 pb-6">
                 <div id="successButtons" class="flex gap-2">
                     <button id="btnShare" class="flex-1 bg-green-500 hover:bg-green-600 py-3 rounded-lg font-bold shadow">Kirim ke WA</button>
                     <button id="btnDownload" class="flex-1 bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold shadow">Simpan</button>
@@ -119,23 +126,23 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
 
+        const rawSnapCanvas = document.createElement('canvas');
+        const rawSnapCtx = rawSnapCanvas.getContext('2d');
+
         let stream = null;
         let processedBlob = null;
         let currentLat = -7.272131;
         let currentLon = 112.686843;
-        let currentHeadingVal = 0;
         let headingTextStr = "Utara (0°)";
         let autoAddressData = {};
 
-        // Pengaturan Tema Watermark (0: Hitam Pekat, 1: Putih Bersih, 2: Transparan)
         let currentThemeIndex = 0;
         const themes = [
-            { name: "Hitam Pekat", bg: 'rgba(0, 0, 0, 0.88)', textMain: '#ffffff', textSub: '#f8fafc', textDim: '#cbd5e1' },
-            { name: "Putih Bersih", bg: 'rgba(255, 255, 255, 0.92)', textMain: '#0f172a', textSub: '#1e293b', textDim: '#475569' },
-            { name: "Transparan", bg: 'rgba(15, 23, 42, 0.70)', textMain: '#ffffff', textSub: '#f8fafc', textDim: '#cbd5e1' }
+            { name: "Hitam Pekat", bg: '#000000', textMain: '#ffffff', textSub: '#f8fafc', textDim: '#cbd5e1' },
+            { name: "Putih Bersih", bg: '#ffffff', textMain: '#0f172a', textSub: '#1e293b', textDim: '#475569' },
+            { name: "Gelap Pro", bg: '#0f172a', textMain: '#ffffff', textSub: '#f8fafc', textDim: '#94a3b8' }
         ];
 
-        // Load Nama Petugas tersimpan
         let savedName = localStorage.getItem('genba_worker_name') || "";
         if(savedName) {
             inputNamaPetugas.value = savedName;
@@ -155,18 +162,15 @@
             btnToggleTheme.innerText = `🎨 Tema: ${themes[currentThemeIndex].name}`;
         });
 
-        // Deteksi Kompas / Arah Hadap HP
         if (window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', (event) => {
-                let alpha = event.alpha; // Kompas 0 - 360 derajat
+                let alpha = event.alpha;
                 if (alpha !== null) {
-                    currentHeadingVal = Math.round(alpha);
+                    let val = Math.round(alpha);
                     let directions = ["Utara (N)", "Timur Laut (NE)", "Timur (E)", "Tenggara (SE)", "Selatan (S)", "Barat Daya (SW)", "Barat (W)", "Barat Laut (NW)"];
-                    let index = Math.round((currentHeadingVal / 45)) % 8;
-                    headingTextStr = `${directions[index]} (${currentHeadingVal}°)`;
+                    let index = Math.round((val / 45)) % 8;
+                    headingTextStr = `${directions[index]} (${val}°)`;
                     liveHeading.innerText = headingTextStr;
-                } else {
-                    liveHeading.innerText = "Tidak tersedia di perangkat";
                 }
             }, true);
         }
@@ -232,6 +236,16 @@
         };
 
         btnSnap.addEventListener('click', async () => {
+            rawSnapCanvas.width = videoElement.videoWidth;
+            rawSnapCanvas.height = videoElement.videoHeight;
+            rawSnapCtx.drawImage(videoElement, 0, 0, rawSnapCanvas.width, rawSnapCanvas.height);
+            videoElement.pause();
+
+            inputNoBangunan.value = "";
+            inputModal.classList.remove('hidden');
+            inputNoBangunan.focus();
+            modalSubText.innerHTML = `📍 Mengunci lokasi GPS & alamat...`;
+
             try {
                 const pos = await getLocation();
                 currentLat = pos.coords.latitude;
@@ -239,14 +253,13 @@
             } catch (e) {}
 
             autoAddressData = await fetchGeoData(currentLat, currentLon);
-            modalSubText.innerHTML = autoAddressData.subWilayah ? `📍 Terdeteksi wilayah <b>${autoAddressData.subWilayah}</b>. Masukkan nomor bangunan.` : `📍 Masukkan nomor bangunan.`;
-
-            inputNoBangunan.value = "";
-            inputModal.classList.remove('hidden');
-            inputNoBangunan.focus();
+            modalSubText.innerHTML = autoAddressData.subWilayah ? `📍 Terdeteksi <b>${autoAddressData.subWilayah}</b>. Masukkan nomor bangunan.` : `📍 Masukkan nomor bangunan.`;
         });
 
-        btnCancelModal.addEventListener('click', () => inputModal.classList.add('hidden'));
+        btnCancelModal.addEventListener('click', () => {
+            inputModal.classList.add('hidden');
+            videoElement.play();
+        });
 
         btnSubmitModal.addEventListener('click', async () => {
             inputModal.classList.add('hidden');
@@ -256,11 +269,34 @@
             loadingText.classList.remove('hidden');
 
             try {
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-                ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                const imgW = rawSnapCanvas.width;
+                const imgH = rawSnapCanvas.height;
+                
+                // Banner khusus alamat di bawah foto (22% dari tinggi foto asli)
+                const bannerH = Math.max(imgH * 0.22, 185);
+
+                // Perluas canvas agar foto + banner menyatu tanpa saling tumpang tindih
+                canvas.width = imgW;
+                canvas.height = imgH + bannerH;
+
+                // 1. Gambar foto paket di bagian atas (100% utuh & tidak tertutup)
+                ctx.drawImage(rawSnapCanvas, 0, 0, imgW, imgH);
                 stopCamera();
 
+                // 2. Gambar area background banner di bagian bawah foto
+                const activeTheme = themes[currentThemeIndex];
+                ctx.fillStyle = activeTheme.bg;
+                ctx.fillRect(0, imgH, imgW, bannerH);
+
+                // Gunting garis pemisah tipis antara foto & banner
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, imgH);
+                ctx.lineTo(imgW, imgH);
+                ctx.stroke();
+
+                // 3. Menyiapkan teks alamat
                 const userNo = inputNoBangunan.value ? `No. ${inputNoBangunan.value.replace(/^(no\.?\s*)/i, '')}` : "";
                 let formatZonaPart = "";
                 if (autoAddressData.subWilayah) {
@@ -280,22 +316,13 @@
 
                 const fullAddress = [...new Set(addressParts.filter(Boolean))].join(", ");
                 const dateTimeStr = getDateTime();
-                const activeTheme = themes[currentThemeIndex];
 
-                // --- RENDER WATERMARK ---
-                const padding = Math.max(canvas.width * 0.02, 15);
-                const boxHeight = Math.max(canvas.height * 0.24, 195); 
-                const boxY = canvas.height - boxHeight - padding;
-                const boxX = padding;
-                const boxWidth = canvas.width - (padding * 2);
+                // 4. Tata letak elemen Peta & Teks di dalam Banner
+                const padding = 15;
+                const mapSize = bannerH - (padding * 2);
+                const mapX = padding;
+                const mapY = imgH + padding;
 
-                ctx.fillStyle = activeTheme.bg;
-                ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-
-                // --- MINI MAP ---
-                const mapSize = boxHeight - (padding * 2);
-                const mapX = boxX + padding;
-                const mapY = boxY + padding;
                 const z = 18;
                 const tileX = Math.floor((currentLon + 180) / 360 * Math.pow(2, z));
                 const tileY = Math.floor((1 - Math.log(Math.tan(currentLat * Math.PI / 180) + 1 / Math.cos(currentLat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
@@ -307,7 +334,7 @@
                     await new Promise((resolve) => {
                         mapImg.onload = () => { ctx.drawImage(mapImg, 28, 28, 200, 200, mapX, mapY, mapSize, mapSize); resolve(); };
                         mapImg.onerror = () => { ctx.fillStyle = '#334155'; ctx.fillRect(mapX, mapY, mapSize, mapSize); resolve(); };
-                        setTimeout(resolve, 1200);
+                        setTimeout(resolve, 1000);
                     });
                 } catch (err) {}
 
@@ -330,20 +357,17 @@
                 ctx.fillText("Google", mapX + 5, mapY + mapSize - 5);
                 ctx.shadowBlur = 0;
 
-                // --- TEKS WATERMARK ---
                 const textStartX = mapX + mapSize + 15;
-                const textMaxWidth = boxWidth - mapSize - (padding * 3) - 5;
-                const fontSizeTitle = Math.max(canvas.width * 0.021, 14);
-                const fontSizeBody = Math.max(canvas.width * 0.016, 11);
+                const textMaxWidth = imgW - mapSize - (padding * 3);
+                const fontSizeTitle = Math.max(imgW * 0.021, 14);
+                const fontSizeBody = Math.max(imgW * 0.016, 11);
 
                 let currentTextY = mapY + 16;
 
-                // Judul
                 ctx.fillStyle = activeTheme.textMain;
                 ctx.font = `bold ${fontSizeTitle}px sans-serif`;
                 ctx.fillText(title, textStartX, currentTextY, textMaxWidth);
 
-                // Alamat Auto-Wrap
                 currentTextY += fontSizeBody + 5;
                 ctx.fillStyle = activeTheme.textSub;
                 ctx.font = `${fontSizeBody}px sans-serif`;
@@ -360,18 +384,15 @@
                 }
                 ctx.fillText(line.replace(/, $/, ''), textStartX, currentTextY);
 
-                // Koordinat & Kompas
                 currentTextY += fontSizeBody + 6;
                 ctx.fillStyle = activeTheme.textDim;
                 ctx.fillText(`Lat ${currentLat.toFixed(6)}° Long ${currentLon.toFixed(6)}° | 🧭 ${headingTextStr}`, textStartX, currentTextY, textMaxWidth);
 
-                // Nama Petugas & Waktu
                 currentTextY += fontSizeBody + 5;
                 let footerInfo = dateTimeStr;
                 if(savedName) footerInfo += ` | By: ${savedName}`;
                 ctx.fillText(footerInfo, textStartX, currentTextY, textMaxWidth);
 
-                // Kompresi Optimal 0.85 agar ramah WhatsApp
                 canvas.toBlob((blob) => {
                     processedBlob = blob;
                     imagePreview.src = URL.createObjectURL(blob);

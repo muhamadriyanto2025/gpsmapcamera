@@ -129,9 +129,13 @@
             <div class="rounded-2xl bg-slate-800/80 border border-white/10 p-3">
                 <div class="flex items-center justify-between">
                     <p class="text-[10px] uppercase tracking-[0.2em] text-yellow-400">Status</p>
-                    <span class="text-[10px] font-medium rounded-full bg-emerald-500/15 text-emerald-300 px-2 py-1 border border-emerald-400/20">Live</span>
+                    <span id="sidebarLiveBadge" class="text-[10px] font-medium rounded-full bg-emerald-500/15 text-emerald-300 px-2 py-1 border border-emerald-400/20">Live</span>
                 </div>
-                <div id="sidebarSummary" class="mt-2 text-sm text-slate-200 leading-relaxed">
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <button id="btnModeLive" type="button" class="py-2.5 rounded-xl text-sm font-semibold border bg-yellow-500 text-slate-950 border-yellow-400">Live Lokasi</button>
+                    <button id="btnModeManual" type="button" class="py-2.5 rounded-xl text-sm font-semibold border bg-slate-700 text-white border-slate-600">Manual Alamat</button>
+                </div>
+                <div id="sidebarSummary" class="mt-3 text-sm text-slate-200 leading-relaxed">
                     Lokasi otomatis berdasarkan GPS aktif.
                 </div>
             </div>
@@ -202,13 +206,14 @@
         const manualLocationFormWrap = document.getElementById('manualLocationFormWrap');
         const manualLocationForm = document.getElementById('manualLocationForm');
         const sidebarSummary = document.getElementById('sidebarSummary');
-        const manualNegara = document.getElementById('manualNegara');
-        const manualKota = document.getElementById('manualKota');
+        const sidebarLiveBadge = document.getElementById('sidebarLiveBadge');
+        const btnModeLive = document.getElementById('btnModeLive');
+        const btnModeManual = document.getElementById('btnModeManual');
         const manualKecamatan = document.getElementById('manualKecamatan');
         const manualKelurahan = document.getElementById('manualKelurahan');
         const manualJalan = document.getElementById('manualJalan');
+        const manualBlok = document.getElementById('manualSubWilayah');
         const manualNoBangunan = document.getElementById('manualNoBangunan');
-        const manualSubWilayah = document.getElementById('manualSubWilayah');
         
         const inputNoBangunan = document.getElementById('inputNoBangunan');
         const inputNamaPetugas = document.getElementById('inputNamaPetugas');
@@ -244,11 +249,33 @@
 
         let savedName = localStorage.getItem('genba_worker_name') || "";
         let manualLocationData = JSON.parse(localStorage.getItem('genba_manual_location') || 'null') || {};
+        let selectedLocationMode = localStorage.getItem('genba_location_mode') || 'live';
 
         if(savedName) {
             inputNamaPetugas.value = savedName;
             labelNamaPetugas.innerText = savedName;
         }
+
+        const setLocationMode = (mode) => {
+            selectedLocationMode = mode;
+            localStorage.setItem('genba_location_mode', mode);
+
+            if (btnModeLive && btnModeManual && sidebarLiveBadge) {
+                if (mode === 'manual') {
+                    btnModeLive.className = 'py-2.5 rounded-xl text-sm font-semibold border bg-slate-700 text-white border-slate-600';
+                    btnModeManual.className = 'py-2.5 rounded-xl text-sm font-semibold border bg-yellow-500 text-slate-950 border-yellow-400';
+                    sidebarLiveBadge.className = 'text-[10px] font-medium rounded-full bg-yellow-500/15 text-yellow-300 px-2 py-1 border border-yellow-400/20';
+                    sidebarLiveBadge.textContent = 'Manual';
+                    manualLocationFormWrap.classList.remove('hidden');
+                } else {
+                    btnModeLive.className = 'py-2.5 rounded-xl text-sm font-semibold border bg-yellow-500 text-slate-950 border-yellow-400';
+                    btnModeManual.className = 'py-2.5 rounded-xl text-sm font-semibold border bg-slate-700 text-white border-slate-600';
+                    sidebarLiveBadge.className = 'text-[10px] font-medium rounded-full bg-emerald-500/15 text-emerald-300 px-2 py-1 border border-emerald-400/20';
+                    sidebarLiveBadge.textContent = 'Live';
+                    manualLocationFormWrap.classList.add('hidden');
+                }
+            }
+        };
 
         const openSidebar = () => {
             rightSidebar.classList.remove('translate-x-full');
@@ -308,24 +335,22 @@
         const buildManualAddressQuery = () => {
             const addressParts = [
                 manualJalan.value.trim(),
+                manualBlok.value.trim(),
                 manualNoBangunan.value.trim(),
-                manualSubWilayah.value.trim(),
                 manualKelurahan.value.trim(),
                 manualKecamatan.value.trim(),
-                manualKota.value.trim() || 'Surabaya',
+                'Surabaya',
                 'Indonesia'
             ];
             return addressParts.filter(Boolean).join(', ');
         };
 
         const fillManualForm = () => {
-            manualNegara.value = 'Indonesia';
-            manualKota.value = 'Surabaya';
             manualKecamatan.value = manualLocationData.kecamatan || "";
             manualKelurahan.value = manualLocationData.kelurahan || "";
             manualJalan.value = manualLocationData.jalan || "";
+            manualBlok.value = manualLocationData.subWilayah || "";
             manualNoBangunan.value = manualLocationData.noBangunan || "";
-            manualSubWilayah.value = manualLocationData.subWilayah || "";
         };
 
         const geocodeAddressText = async (streetText) => {
@@ -357,6 +382,21 @@
         };
 
         const getResolvedAddressData = () => {
+            if (selectedLocationMode === 'manual' && manualLocationData && (manualLocationData.lat || manualLocationData.kota || manualLocationData.jalan)) {
+                return {
+                    ...manualLocationData,
+                    negara: manualLocationData.negara || 'Indonesia',
+                    kota: manualLocationData.kota || 'Surabaya',
+                    kecamatan: manualLocationData.kecamatan || '',
+                    kelurahan: manualLocationData.kelurahan || '',
+                    jalan: manualLocationData.jalan || 'Jl. Utama',
+                    subWilayah: manualLocationData.subWilayah || '',
+                    provinsi: manualLocationData.provinsi || 'Jawa Timur',
+                    lat: manualLocationData.lat ?? currentLat,
+                    lon: manualLocationData.lon ?? currentLon
+                };
+            }
+
             const baseData = autoAddressData || {};
             const streetFromManual = manualLocationData.jalan || baseData.jalan || "";
             const derivedFromStreet = deriveAddressFromStreet(streetFromManual);
@@ -365,19 +405,21 @@
 
             return {
                 ...baseData,
-                negara: manualLocationData.negara || baseData.negara || 'Indonesia',
-                kota: manualLocationData.kota || baseData.kota || 'Surabaya',
+                negara: autoAddressData.negara || 'Indonesia',
+                kota: autoAddressData.kota || 'Surabaya',
                 kecamatan: resolvedKecamatan,
                 kelurahan: resolvedKelurahan,
-                jalan: manualLocationData.jalan || baseData.jalan || "Jl. Utama",
-                subWilayah: manualLocationData.subWilayah || baseData.subWilayah || "",
-                tipeZona: manualLocationData.tipeZona || baseData.tipeZona || "kampung",
-                provinsi: manualLocationData.provinsi || baseData.provinsi || "Jawa Timur",
-                lat: manualLocationData.lat ?? baseData.lat ?? currentLat,
-                lon: manualLocationData.lon ?? baseData.lon ?? currentLon
+                jalan: autoAddressData.jalan || baseData.jalan || "Jl. Utama",
+                subWilayah: autoAddressData.subWilayah || baseData.subWilayah || "",
+                tipeZona: autoAddressData.tipeZona || baseData.tipeZona || "kampung",
+                provinsi: autoAddressData.provinsi || baseData.provinsi || "Jawa Timur",
+                lat: currentLat,
+                lon: currentLon
             };
         };
 
+        btnModeLive.addEventListener('click', () => setLocationMode('live'));
+        btnModeManual.addEventListener('click', () => setLocationMode('manual'));
         btnSidebarToggle.addEventListener('click', openSidebar);
         btnSidebarClose.addEventListener('click', closeSidebar);
         sidebarOverlay.addEventListener('click', closeSidebar);
@@ -392,26 +434,31 @@
             event.preventDefault();
             const query = buildManualAddressQuery();
             if (!query) {
-                alert('Masukkan alamat jalan dan nomor bangunan terlebih dahulu.');
+                alert('Masukkan jalan dan nomor bangunan terlebih dahulu.');
                 return;
             }
 
             const geocodeResult = await geocodeAddressText(query);
+            if (!geocodeResult) {
+                alert('Alamat yang dimasukkan tidak ditemukan. Coba isi jalan atau blok yang lebih lengkap.');
+                return;
+            }
+
             const derivedFromStreet = deriveAddressFromStreet(manualJalan.value.trim());
 
             manualLocationData = {
-                negara: geocodeResult?.negara || 'Indonesia',
-                kota: geocodeResult?.kota || 'Surabaya',
-                kecamatan: manualKecamatan.value.trim() || geocodeResult?.kecamatan || derivedFromStreet.kecamatan.replace(/^Kecamatan\s*/i, ''),
-                kelurahan: manualKelurahan.value.trim() || geocodeResult?.kelurahan || derivedFromStreet.kelurahan.replace(/^Kelurahan\s*/i, ''),
+                negara: geocodeResult.negara || 'Indonesia',
+                kota: geocodeResult.kota || 'Surabaya',
+                kecamatan: manualKecamatan.value.trim() || geocodeResult.kecamatan || derivedFromStreet.kecamatan.replace(/^Kecamatan\s*/i, ''),
+                kelurahan: manualKelurahan.value.trim() || geocodeResult.kelurahan || derivedFromStreet.kelurahan.replace(/^Kelurahan\s*/i, ''),
                 jalan: manualJalan.value.trim(),
                 noBangunan: manualNoBangunan.value.trim(),
-                subWilayah: manualSubWilayah.value.trim() || geocodeResult?.subWilayah || '',
+                subWilayah: manualBlok.value.trim() || geocodeResult.subWilayah || '',
                 tipeZona: 'kampung',
-                provinsi: geocodeResult?.provinsi || autoAddressData.provinsi || 'Jawa Timur',
-                lat: geocodeResult?.lat ?? currentLat,
-                lon: geocodeResult?.lon ?? currentLon,
-                kodepos: geocodeResult?.kodepos || ''
+                provinsi: geocodeResult.provinsi || 'Jawa Timur',
+                lat: geocodeResult.lat,
+                lon: geocodeResult.lon,
+                kodepos: geocodeResult.kodepos || ''
             };
 
             currentLat = manualLocationData.lat;
@@ -430,8 +477,6 @@
                 lon: manualLocationData.lon
             };
 
-            manualNegara.value = manualLocationData.negara;
-            manualKota.value = manualLocationData.kota;
             localStorage.setItem('genba_manual_location', JSON.stringify(manualLocationData));
             renderSidebarSummary();
             manualLocationFormWrap.classList.add('hidden');
@@ -533,12 +578,31 @@
 
         renderSidebarSummary();
         fillManualForm();
+        setLocationMode(selectedLocationMode);
 
         btnSnap.addEventListener('click', async () => {
             rawSnapCanvas.width = videoElement.videoWidth;
             rawSnapCanvas.height = videoElement.videoHeight;
             rawSnapCtx.drawImage(videoElement, 0, 0, rawSnapCanvas.width, rawSnapCanvas.height);
             videoElement.pause();
+
+            if (selectedLocationMode === 'manual') {
+                if (!manualLocationData || !manualLocationData.lat || !manualLocationData.lon) {
+                    alert('Silakan cari lokasi manual dulu di sidebar, lalu ambil foto.');
+                    openSidebar();
+                    return;
+                }
+                autoAddressData = { ...manualLocationData };
+                currentLat = manualLocationData.lat;
+                currentLon = manualLocationData.lon;
+                inputModal.classList.add('hidden');
+                cameraContainer.classList.add('hidden');
+                resultContainer.classList.remove('hidden');
+                resultContainer.classList.add('flex');
+                loadingText.classList.remove('hidden');
+                btnSubmitModal.click();
+                return;
+            }
 
             inputNoBangunan.value = "";
             inputModal.classList.remove('hidden');

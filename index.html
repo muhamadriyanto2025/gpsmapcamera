@@ -7,9 +7,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { overflow: hidden; }
+        .map-app-glow {
+            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.45);
+        }
+        .map-panel-card {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.88));
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center w-full">
+<body class="bg-[#070d17] text-white min-h-screen flex flex-col items-center justify-center w-full">
 
     <div class="w-full max-w-md h-screen relative flex flex-col">
         
@@ -18,13 +25,18 @@
             <video id="videoElement" autoplay playsinline class="w-full h-full object-cover"></video>
             
             <!-- Tombol Pengaturan Cepat di Atas -->
-            <div class="absolute top-4 left-4 right-4 flex justify-between items-center z-20">
+            <div class="absolute top-4 left-4 right-4 flex justify-between items-center z-20 gap-2">
                 <button id="btnToggleTheme" class="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 text-yellow-400">
                     🎨 Tema: Hitam Pekat
                 </button>
-                <button id="btnOpenSetting" class="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 text-white">
-                    👤 <span id="labelNamaPetugas">Atur Nama</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button id="btnSidebarToggle" class="bg-black/50 backdrop-blur-md w-10 h-10 rounded-full text-lg font-bold border border-white/20 text-white flex items-center justify-center shadow-lg" aria-label="Buka menu">
+                        ☰
+                    </button>
+                    <button id="btnOpenSetting" class="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold border border-white/20 text-white">
+                        👤 <span id="labelNamaPetugas">Atur Nama</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Indikator Kompas Live -->
@@ -97,6 +109,74 @@
         <canvas id="canvas" class="hidden"></canvas>
     </div>
 
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/40 hidden z-30"></div>
+    <aside id="rightSidebar" class="fixed top-0 right-0 h-full w-[86%] max-w-sm map-app-glow map-panel-card backdrop-blur-xl transform translate-x-full transition-transform duration-300 z-40 rounded-l-[28px] overflow-hidden">
+        <div class="flex items-center justify-between px-4 pt-5 pb-4 border-b border-white/10">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-yellow-500/15 border border-yellow-400/20 flex items-center justify-center text-lg">📍</div>
+                <div>
+                    <p class="text-[10px] uppercase tracking-[0.22em] text-slate-400">Map</p>
+                    <h3 class="text-base font-bold text-white">GPS Camera</h3>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="btnSidebarSettings" class="w-9 h-9 rounded-full bg-yellow-500/15 border border-yellow-400/30 text-yellow-400 flex items-center justify-center text-lg" aria-label="Atur lokasi manual">⚙️</button>
+                <button id="btnSidebarClose" class="w-9 h-9 rounded-full bg-white/5 border border-white/10 text-white flex items-center justify-center text-lg" aria-label="Tutup sidebar">✕</button>
+            </div>
+        </div>
+
+        <div class="p-4 space-y-4">
+            <div class="rounded-2xl bg-slate-800/80 border border-white/10 p-3">
+                <div class="flex items-center justify-between">
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-yellow-400">Status</p>
+                    <span class="text-[10px] font-medium rounded-full bg-emerald-500/15 text-emerald-300 px-2 py-1 border border-emerald-400/20">Live</span>
+                </div>
+                <div id="sidebarSummary" class="mt-2 text-sm text-slate-200 leading-relaxed">
+                    Lokasi otomatis berdasarkan GPS aktif.
+                </div>
+            </div>
+
+            <div id="manualLocationFormWrap" class="hidden rounded-2xl bg-slate-800/80 border border-white/10 p-4">
+                <div class="mb-3">
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-yellow-400">Tambah lokasi manual</p>
+                    <h4 class="mt-1 text-lg font-bold text-white">Alamat kerja</h4>
+                </div>
+
+                <form id="manualLocationForm" class="space-y-3">
+                    <div>
+                        <label class="block text-[11px] text-slate-300 mb-1">Negara</label>
+                        <input id="manualNegara" type="text" value="Indonesia" disabled class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white/80 focus:outline-none focus:border-yellow-400">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-300 mb-1">Kota</label>
+                        <input id="manualKota" type="text" value="Surabaya" disabled class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white/80 focus:outline-none focus:border-yellow-400">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-300 mb-1">Kecamatan</label>
+                        <input id="manualKecamatan" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-400" placeholder="Contoh: Darmo Harapan atau Sukomanunggal">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-300 mb-1">Kelurahan</label>
+                        <input id="manualKelurahan" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-400" placeholder="Contoh: Putat Jaya">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-300 mb-1">Nama Jalan</label>
+                        <input id="manualJalan" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-400" placeholder="Contoh: Jl. Darmo Harapan Gang V No. EL 5">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-300 mb-1">Gang / Blok / Detail</label>
+                        <input id="manualSubWilayah" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-400" placeholder="Contoh: Gang 2 atau Blok A">
+                    </div>
+
+                    <div class="flex gap-2 pt-2">
+                        <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold py-2.5 rounded-xl text-sm shadow-lg shadow-yellow-500/20">Simpan</button>
+                        <button id="btnResetManualLocation" type="button" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 rounded-xl text-sm">GPS</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </aside>
+
     <script>
         const videoElement = document.getElementById('videoElement');
         const cameraContainer = document.getElementById('cameraContainer');
@@ -110,6 +190,20 @@
         const btnOpenSetting = document.getElementById('btnOpenSetting');
         const btnCloseSetting = document.getElementById('btnCloseSetting');
         const btnToggleTheme = document.getElementById('btnToggleTheme');
+        const btnSidebarToggle = document.getElementById('btnSidebarToggle');
+        const btnSidebarClose = document.getElementById('btnSidebarClose');
+        const btnSidebarSettings = document.getElementById('btnSidebarSettings');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const rightSidebar = document.getElementById('rightSidebar');
+        const manualLocationFormWrap = document.getElementById('manualLocationFormWrap');
+        const manualLocationForm = document.getElementById('manualLocationForm');
+        const sidebarSummary = document.getElementById('sidebarSummary');
+        const manualNegara = document.getElementById('manualNegara');
+        const manualKota = document.getElementById('manualKota');
+        const manualKecamatan = document.getElementById('manualKecamatan');
+        const manualKelurahan = document.getElementById('manualKelurahan');
+        const manualJalan = document.getElementById('manualJalan');
+        const manualSubWilayah = document.getElementById('manualSubWilayah');
         
         const inputNoBangunan = document.getElementById('inputNoBangunan');
         const inputNamaPetugas = document.getElementById('inputNamaPetugas');
@@ -144,10 +238,176 @@
         ];
 
         let savedName = localStorage.getItem('genba_worker_name') || "";
+        let manualLocationData = JSON.parse(localStorage.getItem('genba_manual_location') || 'null') || {};
+
         if(savedName) {
             inputNamaPetugas.value = savedName;
             labelNamaPetugas.innerText = savedName;
         }
+
+        const openSidebar = () => {
+            rightSidebar.classList.remove('translate-x-full');
+            sidebarOverlay.classList.remove('hidden');
+        };
+
+        const closeSidebar = () => {
+            rightSidebar.classList.add('translate-x-full');
+            sidebarOverlay.classList.add('hidden');
+        };
+
+        const normalizeStreetText = (value) => {
+            if (!value) return "";
+            return value
+                .replace(/^(jl|jalan|jln)\s*/i, '')
+                .replace(/^(gang|gng|gg)\s*/i, 'Gang ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+
+        const deriveAddressFromStreet = (streetValue) => {
+            const cleanStreet = normalizeStreetText(streetValue);
+            if (!cleanStreet) return { kecamatan: '', kelurahan: '' };
+
+            const tokens = cleanStreet.split(/\s+/).filter(Boolean);
+            const removeWords = new Set(['no', 'nomor', 'rt', 'rw', 'blok', 'bl', 'gang', 'gng', 'gg', 'kel', 'kec', 'desa', 'kampung']);
+            const meaningful = tokens.filter(token => !removeWords.has(token.toLowerCase()) && !/^\d+$/.test(token) && !/^el\d+$/i.test(token));
+
+            let kecamatan = '';
+            if (meaningful.length >= 2) {
+                kecamatan = meaningful.slice(0, 2).join(' ');
+            } else if (meaningful.length === 1) {
+                kecamatan = meaningful[0];
+            }
+
+            const kelurahan = meaningful.length >= 3 ? meaningful[2] : '';
+            return { kecamatan: kecamatan ? `Kecamatan ${kecamatan}` : '', kelurahan: kelurahan ? `Kelurahan ${kelurahan}` : '' };
+        };
+
+        const renderSidebarSummary = () => {
+            const activeData = getResolvedAddressData();
+            const displayNegara = activeData.negara || "Indonesia";
+            const displayKota = activeData.kota || "Surabaya";
+            const displayKecamatan = activeData.kecamatan || "Kecamatan belum diisi";
+            const displayKelurahan = activeData.kelurahan || "Kelurahan belum diisi";
+            const displayJalan = activeData.jalan || "Jl. belum diisi";
+
+            sidebarSummary.innerHTML = `
+                <strong class="text-yellow-400">Lokasi aktif:</strong><br>
+                ${displayNegara}<br>
+                ${displayKota} • ${displayKecamatan}<br>
+                ${displayKelurahan}<br>
+                ${displayJalan}
+            `;
+        };
+
+        const fillManualForm = () => {
+            manualNegara.value = 'Indonesia';
+            manualKota.value = 'Surabaya';
+            manualKecamatan.value = manualLocationData.kecamatan || "";
+            manualKelurahan.value = manualLocationData.kelurahan || "";
+            manualJalan.value = manualLocationData.jalan || "";
+            manualSubWilayah.value = manualLocationData.subWilayah || "";
+        };
+
+        const geocodeAddressText = async (streetText) => {
+            const query = streetText.trim();
+            if (!query) return null;
+
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=id&q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                if (!Array.isArray(data) || !data[0]) return null;
+
+                const result = data[0];
+                const addr = result.address || {};
+                return {
+                    lat: parseFloat(result.lat),
+                    lon: parseFloat(result.lon),
+                    negara: addr.country || 'Indonesia',
+                    kota: addr.city || addr.town || addr.municipality || addr.county || 'Surabaya',
+                    kecamatan: addr.suburb || addr.city_district || addr.district || addr.county || '',
+                    kelurahan: addr.village || addr.neighbourhood || addr.hamlet || '',
+                    jalan: addr.road || addr.pedestrian || streetText.trim(),
+                    provinsi: translateState(addr.state || 'Jawa Timur'),
+                    kodepos: addr.postcode || '',
+                    subWilayah: addr.neighbourhood || addr.hamlet || addr.suburb || ''
+                };
+            } catch (e) {
+                return null;
+            }
+        };
+
+        const getResolvedAddressData = () => {
+            const baseData = autoAddressData || {};
+            const streetFromManual = manualLocationData.jalan || baseData.jalan || "";
+            const derivedFromStreet = deriveAddressFromStreet(streetFromManual);
+            const resolvedKecamatan = manualLocationData.kecamatan || derivedFromStreet.kecamatan || baseData.kecamatan || "";
+            const resolvedKelurahan = manualLocationData.kelurahan || derivedFromStreet.kelurahan || baseData.kelurahan || "";
+
+            return {
+                ...baseData,
+                negara: manualLocationData.negara || baseData.negara || 'Indonesia',
+                kota: manualLocationData.kota || baseData.kota || 'Surabaya',
+                kecamatan: resolvedKecamatan,
+                kelurahan: resolvedKelurahan,
+                jalan: manualLocationData.jalan || baseData.jalan || "Jl. Utama",
+                subWilayah: manualLocationData.subWilayah || baseData.subWilayah || "",
+                tipeZona: manualLocationData.tipeZona || baseData.tipeZona || "kampung",
+                provinsi: manualLocationData.provinsi || baseData.provinsi || "Jawa Timur",
+                lat: manualLocationData.lat ?? baseData.lat ?? currentLat,
+                lon: manualLocationData.lon ?? baseData.lon ?? currentLon
+            };
+        };
+
+        btnSidebarToggle.addEventListener('click', openSidebar);
+        btnSidebarClose.addEventListener('click', closeSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+        btnSidebarSettings.addEventListener('click', () => {
+            manualLocationFormWrap.classList.toggle('hidden');
+            if (!manualLocationFormWrap.classList.contains('hidden')) {
+                fillManualForm();
+            }
+        });
+
+        manualLocationForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const streetValue = manualJalan.value.trim();
+            if (!streetValue) {
+                alert('Masukkan alamat jalan terlebih dahulu.');
+                return;
+            }
+
+            const geocodeResult = await geocodeAddressText(streetValue);
+            const derivedFromStreet = deriveAddressFromStreet(streetValue);
+
+            manualLocationData = {
+                negara: geocodeResult?.negara || 'Indonesia',
+                kota: geocodeResult?.kota || 'Surabaya',
+                kecamatan: manualKecamatan.value.trim() || geocodeResult?.kecamatan || derivedFromStreet.kecamatan.replace(/^Kecamatan\s*/i, ''),
+                kelurahan: manualKelurahan.value.trim() || geocodeResult?.kelurahan || derivedFromStreet.kelurahan.replace(/^Kelurahan\s*/i, ''),
+                jalan: streetValue,
+                subWilayah: manualSubWilayah.value.trim() || geocodeResult?.subWilayah || '',
+                tipeZona: 'kampung',
+                provinsi: geocodeResult?.provinsi || autoAddressData.provinsi || 'Jawa Timur',
+                lat: geocodeResult?.lat ?? currentLat,
+                lon: geocodeResult?.lon ?? currentLon,
+                kodepos: geocodeResult?.kodepos || ''
+            };
+
+            currentLat = manualLocationData.lat;
+            currentLon = manualLocationData.lon;
+            localStorage.setItem('genba_manual_location', JSON.stringify(manualLocationData));
+            renderSidebarSummary();
+            manualLocationFormWrap.classList.add('hidden');
+            closeSidebar();
+        });
+
+        document.getElementById('btnResetManualLocation').addEventListener('click', () => {
+            manualLocationData = {};
+            localStorage.removeItem('genba_manual_location');
+            fillManualForm();
+            renderSidebarSummary();
+        });
 
         btnOpenSetting.addEventListener('click', () => modalSetting.classList.remove('hidden'));
         btnCloseSetting.addEventListener('click', () => {
@@ -235,6 +495,9 @@
             return { jalan: "Jl. Utama", subWilayah: "", tipeZona: "kampung", kelurahan: "", kecamatan: "Sukomanunggal", kota: "Surabaya", provinsi: "Jawa Timur", kodepos: "", negara: "Indonesia" };
         };
 
+        renderSidebarSummary();
+        fillManualForm();
+
         btnSnap.addEventListener('click', async () => {
             rawSnapCanvas.width = videoElement.videoWidth;
             rawSnapCanvas.height = videoElement.videoHeight;
@@ -253,7 +516,8 @@
             } catch (e) {}
 
             autoAddressData = await fetchGeoData(currentLat, currentLon);
-            modalSubText.innerHTML = autoAddressData.subWilayah ? `📍 Terdeteksi <b>${autoAddressData.subWilayah}</b>. Masukkan nomor bangunan.` : `📍 Masukkan nomor bangunan.`;
+            renderSidebarSummary();
+            modalSubText.innerHTML = getResolvedAddressData().subWilayah ? `📍 Terdeteksi <b>${getResolvedAddressData().subWilayah}</b>. Masukkan nomor bangunan.` : `📍 Masukkan nomor bangunan.`;
         });
 
         btnCancelModal.addEventListener('click', () => {
@@ -297,22 +561,25 @@
                 ctx.stroke();
 
                 // 3. Menyiapkan teks alamat
+                const resolvedAddressData = getResolvedAddressData();
                 const userNo = inputNoBangunan.value ? `No. ${inputNoBangunan.value.replace(/^(no\.?\s*)/i, '')}` : "";
                 let formatZonaPart = "";
-                if (autoAddressData.subWilayah) {
-                    let cleanSub = autoAddressData.subWilayah.replace(/^(gang|blok)\s*/i, '');
-                    formatZonaPart = autoAddressData.tipeZona === "perumahan" ? `Blok ${cleanSub}` : `Gang ${cleanSub}`;
+                if (resolvedAddressData.subWilayah) {
+                    let cleanSub = resolvedAddressData.subWilayah.replace(/^(gang|blok)\s*/i, '');
+                    formatZonaPart = resolvedAddressData.tipeZona === "perumahan" ? `Blok ${cleanSub}` : `Gang ${cleanSub}`;
                 }
 
-                let cleanKec = (autoAddressData.kecamatan || "Sukomanunggal").replace(/^kecamatan\s*/i, '');
-                const title = `Kecamatan ${cleanKec}, ${autoAddressData.provinsi || "Jawa Timur"}, Indonesia 🇮🇩`;
+                let cleanKec = (resolvedAddressData.kecamatan || "Sukomanunggal").replace(/^kecamatan\s*/i, '').replace(/^kec\s*/i, '');
+                let cleanKel = (resolvedAddressData.kelurahan || "").replace(/^kelurahan\s*/i, '').replace(/^kel\s*/i, '');
+                const title = `Kecamatan ${cleanKec}, ${resolvedAddressData.provinsi || "Jawa Timur"}, ${resolvedAddressData.negara || "Indonesia"} 🇮🇩`;
                 
-                let addressParts = [autoAddressData.jalan];
+                let addressParts = [resolvedAddressData.jalan];
                 if (formatZonaPart) addressParts.push(formatZonaPart);
                 if (userNo) addressParts.push(userNo);
-                addressParts.push(autoAddressData.kelurahan, `Kecamatan ${cleanKec}`, autoAddressData.kota);
-                if (autoAddressData.kodepos) addressParts.push(autoAddressData.kodepos);
-                addressParts.push("Indonesia");
+                if (cleanKel) addressParts.push(`Kelurahan ${cleanKel}`);
+                addressParts.push(`Kecamatan ${cleanKec}`, resolvedAddressData.kota);
+                if (resolvedAddressData.kodepos) addressParts.push(resolvedAddressData.kodepos);
+                addressParts.push(resolvedAddressData.negara || "Indonesia");
 
                 const fullAddress = [...new Set(addressParts.filter(Boolean))].join(", ");
                 const dateTimeStr = getDateTime();
@@ -389,7 +656,7 @@
                 ctx.fillText(`Lat ${currentLat.toFixed(6)}° Long ${currentLon.toFixed(6)}° | 🧭 ${headingTextStr}`, textStartX, currentTextY, textMaxWidth);
 
                 currentTextY += fontSizeBody + 5;
-                let footerInfo = dateTimeStr;
+                let footerInfo = `${dateTimeStr} GMT+7`;
                 if(savedName) footerInfo += ` | By: ${savedName}`;
                 ctx.fillText(footerInfo, textStartX, currentTextY, textMaxWidth);
 
@@ -409,9 +676,10 @@
 
         const getDateTime = () => {
             const now = new Date();
+            const jakartaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
             const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-            return `${days[now.getDay()]}, ${String(now.getDate()).padStart(2, '0')}/${months[now.getMonth()]}/${now.getFullYear()} ${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+            return `${days[jakartaNow.getDay()]}, ${String(jakartaNow.getDate()).padStart(2, '0')}/${months[jakartaNow.getMonth()]}/${jakartaNow.getFullYear()} ${jakartaNow.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Jakarta' })}`;
         };
 
         btnRetake.addEventListener('click', () => {

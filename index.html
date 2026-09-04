@@ -161,7 +161,11 @@
                     </div>
                     <div>
                         <label class="block text-[11px] text-slate-300 mb-1">Nama Jalan</label>
-                        <input id="manualJalan" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-400" placeholder="Contoh: Jl. Darmo Harapan Gang V No. EL 5">
+                        <input id="manualJalan" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-400" placeholder="Contoh: Jl. Darmo Harapan">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-300 mb-1">Nomor Bangunan / Rumah / Kios</label>
+                        <input id="manualNoBangunan" type="text" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-400" placeholder="Contoh: EL 5 / 34C / A-5">
                     </div>
                     <div>
                         <label class="block text-[11px] text-slate-300 mb-1">Gang / Blok / Detail</label>
@@ -169,7 +173,7 @@
                     </div>
 
                     <div class="flex gap-2 pt-2">
-                        <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold py-2.5 rounded-xl text-sm shadow-lg shadow-yellow-500/20">Simpan</button>
+                        <button type="submit" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold py-2.5 rounded-xl text-sm shadow-lg shadow-yellow-500/20">Cari Lokasi</button>
                         <button id="btnResetManualLocation" type="button" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 rounded-xl text-sm">GPS</button>
                     </div>
                 </form>
@@ -203,6 +207,7 @@
         const manualKecamatan = document.getElementById('manualKecamatan');
         const manualKelurahan = document.getElementById('manualKelurahan');
         const manualJalan = document.getElementById('manualJalan');
+        const manualNoBangunan = document.getElementById('manualNoBangunan');
         const manualSubWilayah = document.getElementById('manualSubWilayah');
         
         const inputNoBangunan = document.getElementById('inputNoBangunan');
@@ -300,12 +305,26 @@
             `;
         };
 
+        const buildManualAddressQuery = () => {
+            const addressParts = [
+                manualJalan.value.trim(),
+                manualNoBangunan.value.trim(),
+                manualSubWilayah.value.trim(),
+                manualKelurahan.value.trim(),
+                manualKecamatan.value.trim(),
+                manualKota.value.trim() || 'Surabaya',
+                'Indonesia'
+            ];
+            return addressParts.filter(Boolean).join(', ');
+        };
+
         const fillManualForm = () => {
             manualNegara.value = 'Indonesia';
             manualKota.value = 'Surabaya';
             manualKecamatan.value = manualLocationData.kecamatan || "";
             manualKelurahan.value = manualLocationData.kelurahan || "";
             manualJalan.value = manualLocationData.jalan || "";
+            manualNoBangunan.value = manualLocationData.noBangunan || "";
             manualSubWilayah.value = manualLocationData.subWilayah || "";
         };
 
@@ -371,21 +390,22 @@
 
         manualLocationForm.addEventListener('submit', async (event) => {
             event.preventDefault();
-            const streetValue = manualJalan.value.trim();
-            if (!streetValue) {
-                alert('Masukkan alamat jalan terlebih dahulu.');
+            const query = buildManualAddressQuery();
+            if (!query) {
+                alert('Masukkan alamat jalan dan nomor bangunan terlebih dahulu.');
                 return;
             }
 
-            const geocodeResult = await geocodeAddressText(streetValue);
-            const derivedFromStreet = deriveAddressFromStreet(streetValue);
+            const geocodeResult = await geocodeAddressText(query);
+            const derivedFromStreet = deriveAddressFromStreet(manualJalan.value.trim());
 
             manualLocationData = {
                 negara: geocodeResult?.negara || 'Indonesia',
                 kota: geocodeResult?.kota || 'Surabaya',
                 kecamatan: manualKecamatan.value.trim() || geocodeResult?.kecamatan || derivedFromStreet.kecamatan.replace(/^Kecamatan\s*/i, ''),
                 kelurahan: manualKelurahan.value.trim() || geocodeResult?.kelurahan || derivedFromStreet.kelurahan.replace(/^Kelurahan\s*/i, ''),
-                jalan: streetValue,
+                jalan: manualJalan.value.trim(),
+                noBangunan: manualNoBangunan.value.trim(),
                 subWilayah: manualSubWilayah.value.trim() || geocodeResult?.subWilayah || '',
                 tipeZona: 'kampung',
                 provinsi: geocodeResult?.provinsi || autoAddressData.provinsi || 'Jawa Timur',
@@ -396,6 +416,22 @@
 
             currentLat = manualLocationData.lat;
             currentLon = manualLocationData.lon;
+            autoAddressData = {
+                ...autoAddressData,
+                negara: manualLocationData.negara,
+                kota: manualLocationData.kota,
+                kecamatan: manualLocationData.kecamatan,
+                kelurahan: manualLocationData.kelurahan,
+                jalan: manualLocationData.jalan,
+                subWilayah: manualLocationData.subWilayah,
+                provinsi: manualLocationData.provinsi,
+                kodepos: manualLocationData.kodepos,
+                lat: manualLocationData.lat,
+                lon: manualLocationData.lon
+            };
+
+            manualNegara.value = manualLocationData.negara;
+            manualKota.value = manualLocationData.kota;
             localStorage.setItem('genba_manual_location', JSON.stringify(manualLocationData));
             renderSidebarSummary();
             manualLocationFormWrap.classList.add('hidden');
